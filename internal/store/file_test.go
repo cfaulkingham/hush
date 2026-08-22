@@ -3,6 +3,7 @@ package store
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -48,8 +49,8 @@ func TestWriteFileRefusesSymlink(t *testing.T) {
 	if err := os.Symlink(target, link); err != nil {
 		t.Fatal(err)
 	}
-	if err := WriteFile(link, []byte("HUSH1notreal")); err == nil {
-		t.Fatal("expected symlink error")
+	if err := WriteFile(link, []byte("HUSH1notreal")); !errors.Is(err, ErrSymlink) {
+		t.Fatalf("expected ErrSymlink, got %v", err)
 	}
 }
 

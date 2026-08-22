@@ -1,9 +1,16 @@
 package store
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"time"
+)
+
+var (
+	ErrSecretNotFound = errors.New("secret not found")
+	ErrEnvNotFound    = errors.New("environment not found")
+	ErrEnvExists      = errors.New("environment already exists")
 )
 
 func (d *Document) Env(name string) (*Environment, error) {
@@ -12,7 +19,7 @@ func (d *Document) Env(name string) (*Environment, error) {
 	}
 	env, ok := d.Environments[name]
 	if !ok {
-		return nil, fmt.Errorf("environment %s not found. Create it with: hush env new %s", name, name)
+		return nil, fmt.Errorf("%w: environment %s not found. Create it with: hush env new %s", ErrEnvNotFound, name, name)
 	}
 	return env, nil
 }
@@ -22,7 +29,7 @@ func (d *Document) NewEnv(name string, now time.Time) error {
 		return err
 	}
 	if _, ok := d.Environments[name]; ok {
-		return fmt.Errorf("environment %s already exists", name)
+		return fmt.Errorf("%w: environment %s already exists", ErrEnvExists, name)
 	}
 	now = now.UTC()
 	d.Environments[name] = &Environment{UpdatedAt: now, Secrets: map[string]Secret{}}
@@ -55,7 +62,7 @@ func (d *Document) GetSecret(env, key string) (string, error) {
 	}
 	sec, ok := e.Secrets[key]
 	if !ok {
-		return "", fmt.Errorf("secret %s not found in %s", key, env)
+		return "", fmt.Errorf("%w: secret %s not found in %s", ErrSecretNotFound, key, env)
 	}
 	return sec.Value, nil
 }
@@ -66,7 +73,7 @@ func (d *Document) DeleteSecret(env, key string) error {
 		return err
 	}
 	if _, ok := e.Secrets[key]; !ok {
-		return fmt.Errorf("secret %s not found in %s", key, env)
+		return fmt.Errorf("%w: secret %s not found in %s", ErrSecretNotFound, key, env)
 	}
 	delete(e.Secrets, key)
 	now := time.Now().UTC()
