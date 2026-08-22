@@ -89,3 +89,22 @@ func TestEncryptRejectsBadKeySize(t *testing.T) {
 		t.Fatal("expected error")
 	}
 }
+
+func TestDecryptNilEnvironment(t *testing.T) {
+	key := bytes.Repeat([]byte{1}, KeySize)
+	doc := NewDocument("id", "n", time.Now().UTC())
+	doc.Environments["x"] = nil
+	blob, err := Encrypt(doc, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Decrypt(blob, key)
+	if err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	env := got.Environments["x"]
+	if env == nil {
+		return
+	}
+	_ = len(env.Secrets)
+}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -61,6 +62,23 @@ func TestSerializeRoundTrip(t *testing.T) {
 		"QUOTE":    `say "hi"`,
 		"GREETING": "こんにちは",
 	}
+	roundTrip(t, in)
+}
+
+func TestSerializeRoundTripDollar(t *testing.T) {
+	in := map[string]string{
+		"HOME_REF":  "$HOME",
+		"BRACE":     "${FOO}",
+		"MIXED":     `it's $HOME`,
+		"QUOTE":     `say "hi"`,
+		"BOTH":      `say "hi" and $HOME`,
+		"DOLLAR_NL": "line1 $HOME\nline2",
+	}
+	roundTrip(t, in)
+}
+
+func roundTrip(t *testing.T, in map[string]string) {
+	t.Helper()
 	b, err := Serialize(in)
 	if err != nil {
 		t.Fatal(err)
@@ -73,6 +91,20 @@ func TestSerializeRoundTrip(t *testing.T) {
 		if got[k] != v {
 			t.Fatalf("%s: got %q want %q\nserialized:\n%s", k, got[k], v, b)
 		}
+	}
+}
+
+func TestParseDoesNotEchoSecretInError(t *testing.T) {
+	_, err := Parse(bytes.NewReader([]byte("FOO-BAR=hunter2\n")))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "hunter2") {
+		t.Fatalf("leaked value: %v", err)
+	}
+	if !strings.Contains(msg, "FOO-BAR") {
+		t.Fatalf("want key in error: %v", err)
 	}
 }
 

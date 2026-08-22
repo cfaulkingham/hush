@@ -53,11 +53,14 @@ func (a *App) Root() *cobra.Command {
 }
 
 func Main(args []string) int {
-	app := NewOSApp()
-	cmd := app.Root()
+	return NewOSApp().Run(args)
+}
+
+func (a *App) Run(args []string) int {
+	cmd := a.Root()
 	cmd.SetArgs(args)
 	if err := cmd.Execute(); err != nil {
-		fmt.Fprintln(app.Stderr, err.Error())
+		fmt.Fprintln(a.Stderr, err.Error())
 		return exitCode(err)
 	}
 	return 0

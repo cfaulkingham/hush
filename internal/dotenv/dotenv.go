@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -17,7 +18,11 @@ func Parse(r io.Reader) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return godotenv.Unmarshal(string(b))
+	m, err := godotenv.Unmarshal(string(b))
+	if err != nil {
+		return nil, sanitizeParseError(err)
+	}
+	return m, nil
 }
 
 func ParseFile(path string) (map[string]string, error) {
@@ -25,7 +30,36 @@ func ParseFile(path string) (map[string]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot read %s: %w", path, err)
 	}
-	return godotenv.Unmarshal(string(b))
+	m, err := godotenv.Unmarshal(string(b))
+	if err != nil {
+		return nil, sanitizeParseError(err)
+	}
+	return m, nil
+}
+
+// godotenv errors include the rest of the line (KEY=value). Keep the key, drop the value.
+func sanitizeParseError(err error) error {
+	msg := err.Error()
+	if strings.Contains(msg, "unterminated quoted value") {
+		return fmt.Errorf("unterminated quoted value")
+	}
+	const marker = " near "
+	i := strings.LastIndex(msg, marker)
+	if i < 0 {
+		return err
+	}
+	snippet, uerr := strconv.Unquote(msg[i+len(marker):])
+	if uerr != nil {
+		return fmt.Errorf("invalid dotenv syntax")
+	}
+	if n := strings.IndexAny(snippet, "\n\r"); n >= 0 {
+		snippet = snippet[:n]
+	}
+	if eq := strings.IndexAny(snippet, "=:"); eq >= 0 {
+		snippet = snippet[:eq]
+	}
+	snippet = strings.TrimSpace(snippet)
+	return fmt.Errorf("%s near %q", msg[:i], snippet)
 }
 
 func Serialize(secrets map[string]string) ([]byte, error) {
@@ -51,8 +85,8 @@ func quoteDotenv(v string) string {
 	if !needsQuote(v) {
 		return v
 	}
-	// godotenv mishandles values ending with \" inside double quotes; prefer single quotes when safe
-	if strings.Contains(v, `"`) && !strings.ContainsAny(v, "'\n\r") {
+	// godotenv expands $VAR in double-quoted values and mishandles trailing \".
+	if !strings.ContainsAny(v, "'\n\r") && strings.ContainsAny(v, `"$`) {
 		return "'" + v + "'"
 	}
 	return `"` + escapeDotenv(v) + `"`
@@ -66,6 +100,8 @@ func escapeDotenv(v string) string {
 			b.WriteString(`\\`)
 		case '"':
 			b.WriteString(`\"`)
+		case '$':
+			b.WriteString(`\$`)
 		case '\n':
 			b.WriteString(`\n`)
 		case '\r':

@@ -116,6 +116,60 @@ func TestImportMissingFile(t *testing.T) {
 	}
 }
 
+func TestImportMissingFileExitCode(t *testing.T) {
+	dir := t.TempDir()
+	app, _, errb, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	missing := filepath.Join(dir, "nope.env")
+	code := app.Run([]string{"import", missing})
+	if code != 1 {
+		t.Fatalf("exit %d want 1", code)
+	}
+	if !strings.Contains(errb.String(), "cannot read") {
+		t.Fatalf("stderr %s", errb.String())
+	}
+}
+
+func TestImportExportDollarRoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	app, out, _, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	if err := runApp(t, app, "set", "TOKEN=$HOME"); err != nil {
+		t.Fatal(err)
+	}
+	exported := filepath.Join(dir, "out.env")
+	if err := runApp(t, app, "export", "-o", exported); err != nil {
+		t.Fatal(err)
+	}
+	if err := runApp(t, app, "import", exported, "--overwrite"); err != nil {
+		t.Fatal(err)
+	}
+	out.Reset()
+	if err := runApp(t, app, "get", "TOKEN"); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "$HOME\n" {
+		t.Fatalf("got %q", out.String())
+	}
+}
+
+func TestImportParseErrorDoesNotEchoValue(t *testing.T) {
+	dir := t.TempDir()
+	app, _, errb, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	p := filepath.Join(dir, ".env")
+	if err := os.WriteFile(p, []byte("FOO-BAR=hunter2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	code := app.Run([]string{"import", p})
+	if code != 1 {
+		t.Fatalf("exit %d want 1", code)
+	}
+	if strings.Contains(errb.String(), "hunter2") {
+		t.Fatalf("leaked value: %s", errb.String())
+	}
+}
+
 func TestImportMissingEnv(t *testing.T) {
 	dir := t.TempDir()
 	app, _, _, _ := newTestApp(t, dir)

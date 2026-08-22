@@ -70,7 +70,11 @@ func Decrypt(blob []byte, key []byte) (*Document, error) {
 	if doc.Environments == nil {
 		doc.Environments = map[string]*Environment{}
 	}
-	for _, env := range doc.Environments {
+	for name, env := range doc.Environments {
+		if env == nil {
+			doc.Environments[name] = &Environment{Secrets: map[string]Secret{}}
+			continue
+		}
 		if env.Secrets == nil {
 			env.Secrets = map[string]Secret{}
 		}

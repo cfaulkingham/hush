@@ -33,7 +33,10 @@ func (a *App) envLsCmd() *cobra.Command {
 			}
 			sort.Strings(names)
 			for _, name := range names {
-				n := len(doc.Environments[name].Secrets)
+				n := 0
+				if env := doc.Environments[name]; env != nil {
+					n = len(env.Secrets)
+				}
 				mark := ""
 				if name == p.Config.ActiveEnv {
 					mark = "  ●"
