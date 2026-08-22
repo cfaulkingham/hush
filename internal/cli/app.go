@@ -44,7 +44,7 @@ func (a *App) Root() *cobra.Command {
 	}
 	cmd.PersistentFlags().String("env", "", "environment (overrides active)")
 	cmd.PersistentFlags().Bool("plain", false, "disable color")
-	cmd.AddCommand(a.initCmd(), a.statusCmd(), a.useCmd(), a.envCmd(), a.setCmd(), a.getCmd(), a.lsCmd(), a.rmCmd())
+	cmd.AddCommand(a.initCmd(), a.statusCmd(), a.useCmd(), a.envCmd(), a.setCmd(), a.getCmd(), a.lsCmd(), a.rmCmd(), a.importCmd(), a.exportCmd())
 	return cmd
 }
 
