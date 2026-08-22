@@ -2,7 +2,6 @@ package cli
 
 import (
 	"bytes"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -37,8 +36,6 @@ func runApp(t *testing.T, app *App, args ...string) error {
 	t.Helper()
 	cmd := app.Root()
 	cmd.SetArgs(args)
-	cmd.SetOut(io.Discard)
-	cmd.SetErr(io.Discard)
 	return cmd.Execute()
 }
 

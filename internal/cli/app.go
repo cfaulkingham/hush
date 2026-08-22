@@ -42,9 +42,13 @@ func (a *App) Root() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	cmd.Version = "0.1.0"
+	cmd.SetVersionTemplate("hush {{.Version}}\n")
+	cmd.SetOut(a.Stdout)
+	cmd.SetErr(a.Stderr)
 	cmd.PersistentFlags().String("env", "", "environment (overrides active)")
 	cmd.PersistentFlags().Bool("plain", false, "disable color")
-	cmd.AddCommand(a.initCmd(), a.statusCmd(), a.useCmd(), a.envCmd(), a.setCmd(), a.getCmd(), a.lsCmd(), a.rmCmd(), a.importCmd(), a.exportCmd(), a.runCmd(), a.keyCmd())
+	cmd.AddCommand(a.initCmd(), a.statusCmd(), a.useCmd(), a.envCmd(), a.setCmd(), a.getCmd(), a.lsCmd(), a.rmCmd(), a.importCmd(), a.exportCmd(), a.runCmd(), a.keyCmd(), a.versionCmd())
 	return cmd
 }
 
