@@ -3,6 +3,7 @@ module hush
 go 1.23
 
 require (
+	github.com/joho/godotenv v1.5.1
 	github.com/zalando/go-keyring v0.2.8
 	golang.org/x/crypto v0.33.0
 )
