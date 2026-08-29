@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"unicode/utf8"
 )
 
 func testdata(t *testing.T, name string) string {
@@ -75,6 +76,41 @@ func TestSerializeRoundTripDollar(t *testing.T) {
 		"DOLLAR_NL": "line1 $HOME\nline2",
 	}
 	roundTrip(t, in)
+}
+
+func TestSerializeRoundTripTrailingBackslash(t *testing.T) {
+	in := map[string]string{
+		"PLAIN":    `C:\path\`,
+		"SPACED":   `hello world\`,
+		"DOLLAR":   `$HOME\`,
+		"QUOTE":    `say "hi"\`,
+		"APOST":    `it's here\`,
+		"NEWLINE":  "line1\nline2\\",
+		"MULTIPLE": `three\\\`,
+	}
+	roundTrip(t, in)
+}
+
+func FuzzSerializeRoundTrip(f *testing.F) {
+	for _, seed := range []string{"", "plain", `trailing\`, "line1\nline2\\", `$HOME`, `say "hi"`, "こんにちは"} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, value string) {
+		if !utf8.ValidString(value) || strings.ContainsRune(value, '\x00') {
+			t.Skip()
+		}
+		b, err := Serialize(map[string]string{"VALUE": value})
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := Parse(bytes.NewReader(b))
+		if err != nil {
+			t.Fatalf("parse %q: %v\nserialized:\n%s", value, err, b)
+		}
+		if got["VALUE"] != value {
+			t.Fatalf("got %q want %q\nserialized:\n%s", got["VALUE"], value, b)
+		}
+	})
 }
 
 func roundTrip(t *testing.T, in map[string]string) {

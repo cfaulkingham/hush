@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Module path: `hush`. Go version: `1.23`.
+- Module path: `github.com/cfaulkingham/hush`. Go version: `1.23`.
 - Store magic: exactly `HUSH1` (5 bytes). Cipher: XChaCha20-Poly1305, 32-byte key, 24-byte nonce, AAD = magic bytes. File mode `0600`.
 - Key string: `hush_key_v1_` + lowercase hex of 32 bytes. `HUSH_KEY` overrides the keychain when non-empty.
 - Secret keys: `^[A-Za-z_][A-Za-z0-9_]*$`, 1–256 chars. Env names: `^[A-Za-z][A-Za-z0-9_-]*$`, 1–64 chars. Values: UTF-8, 0–65536 bytes.
@@ -30,7 +30,7 @@
 | `LICENSE` | MIT |
 | `.gitignore` | binaries, coverage |
 | `README.md` | install + quickstart |
-| `.github/workflows/test.yml` | ubuntu + macos `go test ./...` |
+| `.github/workflows/test.yml` | Linux/macOS test, vet, and race; Windows vet and cross-build |
 | `cmd/hush/main.go` | `os.Exit(cli.Main(os.Args[1:]))` |
 | `internal/store/document.go` | JSON document, env/secret helpers |
 | `internal/store/crypt.go` | Encrypt/Decrypt |
@@ -88,7 +88,7 @@ Create `LICENSE` with the MIT text, copyright `Copyright (c) 2026 hush contribut
 Create `go.mod`:
 
 ```
-module hush
+module github.com/cfaulkingham/hush
 
 go 1.23
 ```
@@ -1827,9 +1827,9 @@ import (
 	"testing"
 	"time"
 
-	"hush/internal/keyring"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
 
 func newTestApp(t *testing.T, dir string) (*App, *bytes.Buffer, *bytes.Buffer, *keyring.Memory) {
@@ -2000,9 +2000,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"hush/internal/keyring"
-	"hush/internal/run"
-	"hush/internal/ui"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/run"
+	"github.com/cfaulkingham/hush/internal/ui"
 )
 
 type App struct {
@@ -2074,7 +2074,7 @@ import (
 	"errors"
 	"os"
 
-	"hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/keyring"
 )
 
 func exitCode(err error) int {
@@ -2142,9 +2142,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
-	"hush/internal/keyring"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
 
 func (a *App) initCmd() *cobra.Command {
@@ -2210,7 +2210,7 @@ package main
 
 import (
 	"os"
-	"hush/internal/cli"
+	"github.com/cfaulkingham/hush/internal/cli"
 )
 
 func main() {
@@ -2262,7 +2262,7 @@ import (
 	"strings"
 	"testing"
 
-	"hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/project"
 )
 
 func TestStatusAfterInit(t *testing.T) {
@@ -2370,9 +2370,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"hush/internal/keyring"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
 
 func (a *App) loadStore() (string, *project.Project, []byte, *store.Document, error) {
@@ -2435,9 +2435,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"hush/internal/keyring"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
 
 func (a *App) statusCmd() *cobra.Command {
@@ -2500,7 +2500,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/project"
 )
 
 func (a *App) useCmd() *cobra.Command {
@@ -2538,7 +2538,7 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-	"hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/project"
 )
 
 func (a *App) envCmd() *cobra.Command {
@@ -2770,8 +2770,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
 
 func (a *App) setCmd() *cobra.Command {
@@ -2926,8 +2926,8 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
 
 func (a *App) rmCmd() *cobra.Command {
@@ -3138,9 +3138,9 @@ import (
 	"sort"
 
 	"github.com/spf13/cobra"
-	"hush/internal/dotenv"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/dotenv"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
 
 func (a *App) importCmd() *cobra.Command {
@@ -3217,7 +3217,7 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"hush/internal/dotenv"
+	"github.com/cfaulkingham/hush/internal/dotenv"
 )
 
 func (a *App) exportCmd() *cobra.Command {
@@ -3454,8 +3454,8 @@ import (
 	"strings"
 	"testing"
 
-	"hush/internal/keyring"
-	"hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
 )
 
 func TestKeyBackupRestore(t *testing.T) {
@@ -3546,9 +3546,9 @@ import (
 	"os"
 
 	"github.com/spf13/cobra"
-	"hush/internal/keyring"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
 
 func (a *App) keyCmd() *cobra.Command {
@@ -3689,16 +3689,23 @@ on:
   pull_request:
 jobs:
   test:
+    timeout-minutes: 15
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23"
-      - run: go test ./...
+      - run: go vet ./...
+      - if: runner.os != 'Windows'
+        run: go test ./...
+      - if: runner.os == 'Windows'
+        run: go build ./...
+      - if: runner.os != 'Windows'
+        run: go test -race ./...
 ```
 
 `README.md`:
@@ -3711,7 +3718,7 @@ Local-first secrets for people who already have a `.env`.
 ## Install
 
 ```bash
-go install hush/cmd/hush@latest
+go install github.com/cfaulkingham/hush/cmd/hush@latest
 ```
 
 Or from this repo:
@@ -3732,8 +3739,7 @@ hush run -- npm start
 Secrets live in gitignored `.hush/store` (XChaCha20-Poly1305). The project key sits in your OS keychain. CI:
 
 ```bash
-export HUSH_KEY=hush_key_v1_...   # from `hush key backup`
-hush run -- pytest
+HUSH_KEY=hush_key_v1_... hush run -- pytest   # key from `hush key backup`
 ```
 
 ## Commands

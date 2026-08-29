@@ -54,6 +54,33 @@ func TestWriteFileRefusesSymlink(t *testing.T) {
 	}
 }
 
+func TestUpdateRefusesLockSymlink(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "store")
+	key := bytes.Repeat([]byte{5}, KeySize)
+	if err := Save(path, NewDocument("pid", "api", time.Now()), key); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(dir, "target")
+	if err := os.WriteFile(target, []byte("unchanged"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path+".lock"); err != nil {
+		t.Fatal(err)
+	}
+	err := Update(path, key, func(*Document) error { return nil })
+	if !errors.Is(err, ErrLockSymlink) {
+		t.Fatalf("expected ErrLockSymlink, got %v", err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "unchanged" {
+		t.Fatalf("lock symlink target changed: %q", got)
+	}
+}
+
 func TestWriteFileLeavesExistingOnFailure(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("chmod 0555 still writable as root")
@@ -100,5 +127,58 @@ func TestLoadVersionMismatch(t *testing.T) {
 	}
 	if _, err := Load(path, key); err == nil {
 		t.Fatal("expected version error")
+	}
+}
+
+func TestUpdateSerializesConcurrentMutations(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "store")
+	key := bytes.Repeat([]byte{7}, KeySize)
+	if err := Save(path, NewDocument("pid", "api", time.Now()), key); err != nil {
+		t.Fatal(err)
+	}
+
+	firstEntered := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	secondEntered := make(chan struct{})
+	firstDone := make(chan error, 1)
+	secondDone := make(chan error, 1)
+	now := time.Now()
+	go func() {
+		firstDone <- Update(path, key, func(doc *Document) error {
+			close(firstEntered)
+			<-releaseFirst
+			return doc.PutSecret("development", "FIRST", "1", now)
+		})
+	}()
+	<-firstEntered
+	go func() {
+		secondDone <- Update(path, key, func(doc *Document) error {
+			close(secondEntered)
+			return doc.PutSecret("development", "SECOND", "2", now)
+		})
+	}()
+
+	select {
+	case <-secondEntered:
+		t.Fatal("second update entered while the first held the store lock")
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(releaseFirst)
+	if err := <-firstDone; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-secondDone; err != nil {
+		t.Fatal(err)
+	}
+
+	doc, err := Load(path, key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"FIRST", "SECOND"} {
+		if _, err := doc.GetSecret("development", name); err != nil {
+			t.Fatalf("lost concurrent update %s: %v", name, err)
+		}
 	}
 }

@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 	"github.com/spf13/cobra"
-	"hush/internal/project"
 )
 
 func (a *App) envCmd() *cobra.Command {
@@ -55,14 +56,13 @@ func (a *App) envNewCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Create an empty environment",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, p, key, doc, err := a.loadStore()
+			_, p, key, err := a.projectKey()
 			if err != nil {
 				return err
 			}
-			if err := doc.NewEnv(args[0], a.Now()); err != nil {
-				return err
-			}
-			if err := a.save(p, doc, key); err != nil {
+			if err := a.updateStore(p, key, func(doc *store.Document) error {
+				return doc.NewEnv(args[0], a.Now())
+			}); err != nil {
 				return err
 			}
 			fmt.Fprintf(a.Stdout, "Created environment %s.\n", args[0])

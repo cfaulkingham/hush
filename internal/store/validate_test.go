@@ -9,7 +9,7 @@ func TestValidateKey(t *testing.T) {
 			t.Fatalf("%s: %v", k, err)
 		}
 	}
-	bad := []string{"", "1FOO", "FOO-BAR", "FOO.BAR", "FOO BAR", string(make([]byte, 257))}
+	bad := []string{"", "1FOO", "FOO-BAR", "FOO.BAR", "FOO BAR", "HUSH_KEY", "hush_key", string(make([]byte, 257))}
 	for _, k := range bad {
 		if err := ValidateKey(k); err == nil {
 			t.Fatalf("expected error for %q", k)

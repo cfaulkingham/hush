@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"hush/internal/cli"
+	"github.com/cfaulkingham/hush/internal/cli"
 )
 
 func main() {

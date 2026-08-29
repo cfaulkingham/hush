@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"hush/internal/dotenv"
-	"hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/dotenv"
+	"github.com/cfaulkingham/hush/internal/keyring"
 )
 
 func TestExitCodeMissingFileIsOne(t *testing.T) {

@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/run"
+	"github.com/cfaulkingham/hush/internal/ui"
 	"github.com/spf13/cobra"
-	"hush/internal/keyring"
-	"hush/internal/run"
-	"hush/internal/ui"
 )
 
 type App struct {

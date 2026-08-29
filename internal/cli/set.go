@@ -6,10 +6,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/cfaulkingham/hush/internal/store"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
-	"hush/internal/project"
-	"hush/internal/store"
 )
 
 func (a *App) setCmd() *cobra.Command {
@@ -19,18 +18,18 @@ func (a *App) setCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Set a secret",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			_, p, key, doc, envName, err := a.open(cmd)
+			_, p, key, err := a.projectKey()
 			if err != nil {
 				return err
 			}
+			envName := a.resolvedEnv(cmd, p)
 			name, value, err := a.readSetValue(args[0], fromStdin)
 			if err != nil {
 				return err
 			}
-			if err := doc.PutSecret(envName, name, value, a.Now()); err != nil {
-				return err
-			}
-			if err := store.Save(project.StorePath(p.Root), doc, key); err != nil {
+			if err := a.updateStore(p, key, func(doc *store.Document) error {
+				return doc.PutSecret(envName, name, value, a.Now())
+			}); err != nil {
 				return err
 			}
 			fmt.Fprintf(a.Stdout, "Set %s in %s.\n", name, envName)

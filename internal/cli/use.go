@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
+	"github.com/cfaulkingham/hush/internal/project"
 	"github.com/spf13/cobra"
-	"hush/internal/project"
 )
 
 func (a *App) useCmd() *cobra.Command {

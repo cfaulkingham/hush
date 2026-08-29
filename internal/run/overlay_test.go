@@ -27,6 +27,21 @@ func TestExecNoCommand(t *testing.T) {
 	}
 }
 
+func TestOverlayStripsMasterKey(t *testing.T) {
+	out := Overlay(
+		[]string{"PATH=/bin", "HUSH_KEY=master", "hush_key=case-variant"},
+		map[string]string{"SAFE": "yes", "HUSH_KEY": "stored-master"},
+	)
+	for _, kv := range out {
+		if kv == "HUSH_KEY=master" || kv == "hush_key=case-variant" || kv == "HUSH_KEY=stored-master" {
+			t.Fatalf("master key leaked into child environment: %v", out)
+		}
+	}
+	if len(out) != 2 {
+		t.Fatalf("unexpected environment: %v", out)
+	}
+}
+
 func indexByte(s string, c byte) int {
 	for i := 0; i < len(s); i++ {
 		if s[i] == c {

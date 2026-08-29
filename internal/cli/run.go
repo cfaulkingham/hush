@@ -1,8 +1,8 @@
 package cli
 
 import (
+	"github.com/cfaulkingham/hush/internal/run"
 	"github.com/spf13/cobra"
-	"hush/internal/run"
 )
 
 func (a *App) runCmd() *cobra.Command {

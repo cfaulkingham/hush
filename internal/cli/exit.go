@@ -4,7 +4,7 @@ import (
 	"errors"
 	"os"
 
-	"hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/keyring"
 )
 
 func exitCode(err error) int {

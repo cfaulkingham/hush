@@ -3,6 +3,7 @@ package store
 import (
 	"fmt"
 	"regexp"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -16,6 +17,9 @@ var (
 func ValidateKey(key string) error {
 	if len(key) < 1 || len(key) > 256 || !keyRe.MatchString(key) {
 		return fmt.Errorf("invalid secret key %q (use KEY_NAME)", key)
+	}
+	if strings.EqualFold(key, "HUSH_KEY") {
+		return fmt.Errorf("invalid secret key %q (reserved by hush)", key)
 	}
 	return nil
 }

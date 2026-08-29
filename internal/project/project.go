@@ -5,9 +5,14 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+
+	"github.com/cfaulkingham/hush/internal/safeio"
 )
 
-var ErrNotFound = errors.New("no hush project (run hush init)")
+var (
+	ErrNotFound      = errors.New("no hush project (run hush init)")
+	ErrConfigSymlink = errors.New("refusing to write through symlink .hush/config.json")
+)
 
 type Config struct {
 	ProjectID string `json:"project_id"`
@@ -66,5 +71,9 @@ func SaveConfig(root string, cfg Config) error {
 		return err
 	}
 	b = append(b, '\n')
-	return os.WriteFile(ConfigPath(root), b, 0644)
+	err = safeio.WriteFile(ConfigPath(root), b, 0644)
+	if errors.Is(err, safeio.ErrSymlink) {
+		return ErrConfigSymlink
+	}
+	return err
 }

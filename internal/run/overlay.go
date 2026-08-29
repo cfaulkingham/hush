@@ -10,6 +10,9 @@ func Overlay(parent []string, secrets map[string]string) []string {
 		if !ok {
 			continue
 		}
+		if reserved(k) {
+			continue
+		}
 		if _, take := secrets[k]; take {
 			continue
 		}
@@ -20,7 +23,14 @@ func Overlay(parent []string, secrets map[string]string) []string {
 		out = append(out, kv)
 	}
 	for k, v := range secrets {
+		if reserved(k) {
+			continue
+		}
 		out = append(out, k+"="+v)
 	}
 	return out
+}
+
+func reserved(key string) bool {
+	return strings.EqualFold(key, "HUSH_KEY")
 }

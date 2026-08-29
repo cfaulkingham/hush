@@ -1,11 +1,12 @@
 package cli
 
 import (
+	"errors"
 	"strings"
 	"testing"
 
-	"hush/internal/keyring"
-	"hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
 )
 
 func TestKeyBackupRestore(t *testing.T) {
@@ -72,5 +73,32 @@ func TestKeyRestoreDoesNotWriteWhenHUSH_KEYSet(t *testing.T) {
 	}
 	if _, err := ring.Get("hush", p.Config.ProjectID); err == nil {
 		t.Fatal("wrote keychain despite HUSH_KEY")
+	}
+}
+
+func TestKeyRestoreRejectsProjectIDMismatch(t *testing.T) {
+	dir := t.TempDir()
+	app, _, _, ring := newTestApp(t, dir)
+	if err := runApp(t, app, "init"); err != nil {
+		t.Fatal(err)
+	}
+	p, err := project.Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	master, err := ring.Get("hush", p.Config.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p.Config.ProjectID = "different-project"
+	if err := project.SaveConfig(dir, p.Config); err != nil {
+		t.Fatal(err)
+	}
+	err = runApp(t, app, "key", "restore", master)
+	if !errors.Is(err, ErrProjectMismatch) {
+		t.Fatalf("expected project mismatch, got %v", err)
+	}
+	if _, err := ring.Get("hush", "different-project"); !errors.Is(err, keyring.ErrNotFound) {
+		t.Fatalf("stored key under mismatched project: %v", err)
 	}
 }

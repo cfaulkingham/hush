@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
 	"github.com/spf13/cobra"
-	"hush/internal/keyring"
-	"hush/internal/project"
-	"hush/internal/store"
 )
 
 func (a *App) keyCmd() *cobra.Command {
@@ -53,7 +52,7 @@ func (a *App) keyRestoreCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			if _, err := store.Load(project.StorePath(p.Root), raw); err != nil {
+			if _, err := loadProjectDocument(p, raw); err != nil {
 				return err
 			}
 			if os.Getenv("HUSH_KEY") != "" {

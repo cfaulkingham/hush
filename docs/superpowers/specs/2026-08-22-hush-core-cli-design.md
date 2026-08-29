@@ -74,12 +74,14 @@ Data flow:
 3. Decrypt `.hush/store` with XChaCha20-Poly1305.
 4. Resolve environment: `--env` flag if present, else `config.json` `active_env`.
 5. Mutating commands write a new ciphertext (fresh nonce) via temp file + rename, mode `0600`.
+6. Read-modify-write commands hold an advisory `.hush/store.lock` for the complete transaction so concurrent invocations cannot lose updates.
 
 ### On-disk layout
 
 ```text
 .hush/config.json   plaintext, 0644
 .hush/store         binary, 0600, gitignored
+.hush/store.lock    advisory transaction lock, 0600, gitignored
 ```
 
 `hush init` appends `.hush/` to `.gitignore` (creates the file if missing; does not duplicate an existing `.hush/` line).
@@ -137,7 +139,7 @@ Rules:
 - `version` must be `1`. Any other value → error naming the version, no write.
 - `project_id` must equal `config.json` `project_id`.
 - Environment names: `^[A-Za-z][A-Za-z0-9_-]*$`, 1–64 chars. Default created by init: `development`.
-- Secret keys: `^[A-Za-z_][A-Za-z0-9_]*$`, 1–256 chars (POSIX-ish env names).
+- Secret keys: `^[A-Za-z_][A-Za-z0-9_]*$`, 1–256 chars (POSIX-ish env names). `HUSH_KEY` is reserved, case-insensitively.
 - Secret values: UTF-8 text, 0–65536 bytes. Binary is rejected.
 - JSON object keys are written sorted (environments, then secrets) so snapshots in tests are stable. Nonces are still random, so ciphertext always changes.
 
@@ -184,6 +186,7 @@ Cobra + lipgloss. Quiet one-line successes. No banners, no telemetry, no auto-up
 - Refuses if `.hush/store` already exists in cwd (not parents): `already a hush project. See hush status.`
 - `name` defaults to the current directory’s base name.
 - Creates `.hush/`, writes `config.json` with a new UUID and `active_env=development`.
+- Refuses while `HUSH_KEY` is set so the freshly generated key cannot be shadowed on the next command.
 - Generates 32-byte key, stores it in the keychain under that UUID.
 - Writes an encrypted store with one empty environment `development`.
 - Ensures `.gitignore` contains `.hush/`.
@@ -276,6 +279,7 @@ With `--values`, `KEY` then two spaces then value. Values may be long; do not tr
 
 - Requires at least one command token. Example in the error: `hush run -- npm start`.
 - Loads secrets for the resolved env, copies `os.Environ()`, overlays secrets (secrets win on name conflict).
+- Removes `HUSH_KEY` from the child environment; the decrypt key is never inherited by the launched command.
 - Does not read `.env` from disk.
 - Unix: `syscall.Exec` so hush is replaced (signals and exit code are the child’s).
 - Windows: start the process, forward stdin/stdout/stderr, wait, exit with the child’s code.
@@ -323,7 +327,7 @@ Rules:
 - `internal/cli`: temp directories, cobra `ExecuteC`. Cover init, import, ls (assert values absent), get, set, rm, use, env new, export, run (child that prints one injected var), key backup/restore.
 - `internal/run`: overlay wins over parent env; missing command errors.
 
-GitHub Actions: `go test ./...` on ubuntu-latest and macos-latest. Windows is supported at the keyring/exec layer but is not a required CI OS in this slice.
+GitHub Actions: vet, unit tests, and the race detector on Linux and macOS, plus vet and a cross-build on Windows.
 
 ## Repo layout
 
@@ -337,7 +341,7 @@ internal/dotenv/
 internal/run/
 internal/ui/
 testdata/dotenv/
-go.mod                  module hush, go 1.23
+go.mod                  module github.com/cfaulkingham/hush, go 1.23
 README.md               install via `go install` / `go build`, quickstart matching this spec
 LICENSE                 MIT
 .gitignore

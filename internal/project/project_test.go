@@ -1,6 +1,7 @@
 package project
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,5 +57,30 @@ func TestSaveConfigRoundTrip(t *testing.T) {
 	}
 	if got.ProjectID != "abc" || got.ActiveEnv != "staging" {
 		t.Fatalf("%+v", got)
+	}
+}
+
+func TestSaveConfigRefusesSymlink(t *testing.T) {
+	root := t.TempDir()
+	if err := os.Mkdir(filepath.Join(root, ".hush"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(root, "target.json")
+	if err := os.WriteFile(target, []byte("unchanged"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, ConfigPath(root)); err != nil {
+		t.Fatal(err)
+	}
+	err := SaveConfig(root, Config{ProjectID: "abc", ActiveEnv: "development"})
+	if !errors.Is(err, ErrConfigSymlink) {
+		t.Fatalf("expected ErrConfigSymlink, got %v", err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "unchanged" {
+		t.Fatalf("symlink target changed: %q", got)
 	}
 }

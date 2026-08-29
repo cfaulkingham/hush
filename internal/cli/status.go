@@ -4,10 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 	"github.com/spf13/cobra"
-	"hush/internal/keyring"
-	"hush/internal/project"
-	"hush/internal/store"
 )
 
 func (a *App) statusCmd() *cobra.Command {
@@ -32,14 +32,21 @@ func (a *App) statusCmd() *cobra.Command {
 				storeLine = "decrypt failed"
 				loadErr = kerr
 			} else {
-				doc, err := store.Load(project.StorePath(p.Root), key)
+				doc, err := loadProjectDocument(p, key)
 				if err != nil {
-					storeLine = "decrypt failed"
+					if errors.Is(err, store.ErrDecrypt) {
+						storeLine = "decrypt failed"
+					} else {
+						storeLine = "validation failed"
+					}
 					loadErr = err
 				} else {
 					name = doc.Name
 					if env, err := doc.Env(p.Config.ActiveEnv); err == nil {
 						nsecrets = len(env.Secrets)
+					} else {
+						storeLine = "validation failed"
+						loadErr = err
 					}
 				}
 			}
@@ -50,9 +57,6 @@ func (a *App) statusCmd() *cobra.Command {
 			fmt.Fprintf(a.Stdout, "store:    %s\n", storeLine)
 			fmt.Fprintf(a.Stdout, "key:      %s\n", keySource())
 			if loadErr != nil {
-				if errors.Is(loadErr, store.ErrDecrypt) {
-					return store.ErrDecrypt
-				}
 				return loadErr
 			}
 			return nil

@@ -2,16 +2,25 @@ package cli
 
 import (
 	"bytes"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
-	"hush/internal/keyring"
-	"hush/internal/project"
-	"hush/internal/store"
+	"github.com/cfaulkingham/hush/internal/keyring"
+	"github.com/cfaulkingham/hush/internal/project"
+	"github.com/cfaulkingham/hush/internal/store"
 )
+
+type failingSetRing struct {
+	*keyring.Memory
+}
+
+func (f failingSetRing) Set(string, string, string) error {
+	return errors.New("injected keychain failure")
+}
 
 func newTestApp(t *testing.T, dir string) (*App, *bytes.Buffer, *bytes.Buffer, *keyring.Memory) {
 	t.Helper()
@@ -128,5 +137,68 @@ func TestInitDefaultNameIsDirBase(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), `"myapp"`) {
 		t.Fatalf("stdout %s", out.String())
+	}
+}
+
+func TestInitRefusesHUSHKeyWithoutCreatingProject(t *testing.T) {
+	dir := t.TempDir()
+	app, _, _, _ := newTestApp(t, dir)
+	t.Setenv("HUSH_KEY", "hush_key_v1_"+strings.Repeat("0", 64))
+	err := runApp(t, app, "init")
+	if err == nil || !strings.Contains(err.Error(), "unset it") {
+		t.Fatalf("got %v", err)
+	}
+	if _, err := os.Stat(project.Dir(dir)); !os.IsNotExist(err) {
+		t.Fatalf("init left project state: %v", err)
+	}
+}
+
+func TestInitGitignoreFailureLeavesNoProject(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.Mkdir(filepath.Join(dir, ".gitignore"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	app, _, _, _ := newTestApp(t, dir)
+	if err := runApp(t, app, "init"); err == nil {
+		t.Fatal("expected gitignore failure")
+	}
+	if _, err := os.Stat(project.Dir(dir)); !os.IsNotExist(err) {
+		t.Fatalf("init left project state: %v", err)
+	}
+}
+
+func TestInitKeychainFailureRollsBackProject(t *testing.T) {
+	dir := t.TempDir()
+	app, _, _, ring := newTestApp(t, dir)
+	app.Ring = failingSetRing{Memory: ring}
+	err := runApp(t, app, "init")
+	if err == nil || !strings.Contains(err.Error(), "injected keychain failure") {
+		t.Fatalf("got %v", err)
+	}
+	if _, err := os.Stat(project.Dir(dir)); !os.IsNotExist(err) {
+		t.Fatalf("init left project state: %v", err)
+	}
+}
+
+func TestInitRollbackRestoresPreexistingConfig(t *testing.T) {
+	dir := t.TempDir()
+	old := project.Config{ProjectID: "old-project", ActiveEnv: "staging"}
+	if err := project.SaveConfig(dir, old); err != nil {
+		t.Fatal(err)
+	}
+	app, _, _, ring := newTestApp(t, dir)
+	app.Ring = failingSetRing{Memory: ring}
+	if err := runApp(t, app, "init"); err == nil {
+		t.Fatal("expected keychain failure")
+	}
+	got, err := project.LoadConfig(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != old {
+		t.Fatalf("rollback changed existing config: got %+v want %+v", got, old)
+	}
+	if _, err := os.Stat(project.StorePath(dir)); !os.IsNotExist(err) {
+		t.Fatalf("rollback left store: %v", err)
 	}
 }

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/cfaulkingham/hush/internal/dotenv"
 	"github.com/spf13/cobra"
-	"hush/internal/dotenv"
 )
 
 func (a *App) exportCmd() *cobra.Command {

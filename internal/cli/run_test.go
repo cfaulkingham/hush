@@ -3,6 +3,8 @@ package cli
 import (
 	"strings"
 	"testing"
+
+	"github.com/cfaulkingham/hush/internal/project"
 )
 
 func TestRunOverlaysAndExec(t *testing.T) {
@@ -66,5 +68,36 @@ func TestRunEnvFlag(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("%v", gotEnv)
+	}
+}
+
+func TestRunDoesNotPassHUSHKeyToChild(t *testing.T) {
+	dir := t.TempDir()
+	app, _, _, ring := newTestApp(t, dir)
+	if err := runApp(t, app, "init"); err != nil {
+		t.Fatal(err)
+	}
+	p, err := project.Find(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	master, err := ring.Get("hush", p.Config.ProjectID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HUSH_KEY", master)
+	app.Environ = func() []string { return []string{"PATH=/bin", "HUSH_KEY=" + master} }
+	var childEnv []string
+	app.Exec = func(argv, env []string) error {
+		childEnv = append([]string{}, env...)
+		return nil
+	}
+	if err := runApp(t, app, "run", "true"); err != nil {
+		t.Fatal(err)
+	}
+	for _, kv := range childEnv {
+		if strings.HasPrefix(strings.ToUpper(kv), "HUSH_KEY=") {
+			t.Fatalf("master key leaked to child: %v", childEnv)
+		}
 	}
 }
