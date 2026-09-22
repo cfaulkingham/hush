@@ -55,31 +55,34 @@ func TestResolvePrefersHUSH_KEY(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("HUSH_KEY", s)
 	m := NewMemory()
 	other, _ := FormatKey(bytes.Repeat([]byte{4}, 32))
 	_ = m.Set(Service, "pid", other)
-	got, err := Resolve(m, "pid")
+	got, source, err := Resolve(m, "pid", s)
 	if err != nil || !bytes.Equal(got, raw) {
 		t.Fatalf("got %x %v", got, err)
+	}
+	if source != SourceEnv {
+		t.Fatalf("source %q want %q", source, SourceEnv)
 	}
 }
 
 func TestResolveKeychain(t *testing.T) {
-	t.Setenv("HUSH_KEY", "")
 	raw := bytes.Repeat([]byte{5}, 32)
 	s, _ := FormatKey(raw)
 	m := NewMemory()
 	_ = m.Set(Service, "pid", s)
-	got, err := Resolve(m, "pid")
+	got, source, err := Resolve(m, "pid", "")
 	if err != nil || !bytes.Equal(got, raw) {
 		t.Fatalf("got %x %v", got, err)
+	}
+	if source != SourceKeyring {
+		t.Fatalf("source %q want %q", source, SourceKeyring)
 	}
 }
 
 func TestResolveMissing(t *testing.T) {
-	t.Setenv("HUSH_KEY", "")
-	_, err := Resolve(NewMemory(), "pid")
+	_, _, err := Resolve(NewMemory(), "pid", "")
 	if err == nil {
 		t.Fatal("expected ErrNoKey")
 	}

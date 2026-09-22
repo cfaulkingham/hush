@@ -18,6 +18,14 @@ func (a *App) setCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		Short: "Set a secret",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			name, _, inline := strings.Cut(args[0], "=")
+			if fromStdin && inline {
+				return usage(fmt.Errorf("pass the key name only with --from-stdin (got %q)", name))
+			}
+			if inline {
+				fmt.Fprintln(a.Stderr, "warning: KEY=VALUE on the command line leaks the value into shell history and process listings.")
+				fmt.Fprintln(a.Stderr, "Prefer `hush set KEY` (hidden prompt) or `hush set KEY --from-stdin`.")
+			}
 			_, p, key, err := a.projectKey()
 			if err != nil {
 				return err

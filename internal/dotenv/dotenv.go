@@ -3,6 +3,7 @@ package dotenv
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -115,7 +116,8 @@ func decodeCanonicalValue(encoded string) (string, bool) {
 	return value.String(), true
 }
 
-// godotenv errors include the rest of the line (KEY=value). Keep the key, drop the value.
+// godotenv errors include the input (KEY=value). Keep a short key, drop the
+// value, and never echo long stretches of the file.
 func sanitizeParseError(err error) error {
 	msg := err.Error()
 	if strings.Contains(msg, "unterminated quoted value") {
@@ -124,7 +126,7 @@ func sanitizeParseError(err error) error {
 	const marker = " near "
 	i := strings.LastIndex(msg, marker)
 	if i < 0 {
-		return err
+		return fmt.Errorf("invalid dotenv syntax")
 	}
 	snippet, uerr := strconv.Unquote(msg[i+len(marker):])
 	if uerr != nil {
@@ -137,7 +139,15 @@ func sanitizeParseError(err error) error {
 		snippet = snippet[:eq]
 	}
 	snippet = strings.TrimSpace(snippet)
-	return fmt.Errorf("%s near %q", msg[:i], snippet)
+	if r := []rune(snippet); len(r) > 64 {
+		snippet = string(r[:64]) + "..."
+	}
+	out := fmt.Sprintf("%s near %q", msg[:i], snippet)
+	// %q escaping can balloon (binary input); never echo long stretches.
+	if len(out) > 160 {
+		out = fmt.Sprintf("%s near <elided>", msg[:i])
+	}
+	return errors.New(out)
 }
 
 func Serialize(secrets map[string]string) ([]byte, error) {
@@ -199,6 +209,29 @@ func needsQuote(v string) bool {
 		return true
 	}
 	return false
+}
+
+// ParseJSON reads a JSON object of string values (the format written by
+// SerializeJSON) so import and export round-trip.
+func ParseJSON(r io.Reader) (map[string]string, error) {
+	b, err := io.ReadAll(r)
+	if err != nil {
+		return nil, err
+	}
+	var raw map[string]any
+	if err := json.Unmarshal(b, &raw); err != nil {
+		// json errors can quote snippets of the input; keep only the kind.
+		return nil, fmt.Errorf("invalid json secrets file (%T)", err)
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("json value for %q must be a string", k)
+		}
+		out[k] = s
+	}
+	return out, nil
 }
 
 func SerializeJSON(secrets map[string]string) ([]byte, error) {

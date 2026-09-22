@@ -7,7 +7,7 @@ import (
 )
 
 func (a *App) getCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "get <KEY>",
 		Args:  cobra.ExactArgs(1),
 		Short: "Print a secret value",
@@ -24,4 +24,6 @@ func (a *App) getCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = a.completeKeys
+	return cmd
 }

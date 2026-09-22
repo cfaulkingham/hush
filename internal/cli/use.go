@@ -8,7 +8,7 @@ import (
 )
 
 func (a *App) useCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "use <env>",
 		Args:  cobra.ExactArgs(1),
 		Short: "Set the active environment",
@@ -29,4 +29,6 @@ func (a *App) useCmd() *cobra.Command {
 			return nil
 		},
 	}
+	cmd.ValidArgsFunction = a.completeEnvs
+	return cmd
 }

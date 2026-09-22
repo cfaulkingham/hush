@@ -25,18 +25,18 @@ func (f failingSetRing) Set(string, string, string) error {
 func newTestApp(t *testing.T, dir string) (*App, *bytes.Buffer, *bytes.Buffer, *keyring.Memory) {
 	t.Helper()
 	t.Setenv("HUSH_KEY", "")
-	t.Setenv("NO_COLOR", "1")
 	out, errb := &bytes.Buffer{}, &bytes.Buffer{}
 	ring := keyring.NewMemory()
 	app := &App{
-		Ring:    ring,
-		Stdout:  out,
-		Stderr:  errb,
-		Stdin:   bytes.NewReader(nil),
-		Getwd:   func() (string, error) { return dir, nil },
-		Environ: func() []string { return []string{} },
-		Exec:    func(argv, env []string) error { return nil },
-		Now:     func() time.Time { return time.Date(2026, 8, 22, 12, 0, 0, 0, time.UTC) },
+		Ring:     ring,
+		Stdout:   out,
+		Stderr:   errb,
+		Stdin:    bytes.NewReader(nil),
+		Getwd:    func() (string, error) { return dir, nil },
+		Environ:  func() []string { return []string{} },
+		Exec:     func(argv, env []string) error { return nil },
+		Now:      func() time.Time { return time.Date(2026, 8, 22, 12, 0, 0, 0, time.UTC) },
+		GitCheck: func(string) gitVerdict { return gitUnknown },
 	}
 	return app, out, errb, ring
 }
@@ -67,7 +67,7 @@ func TestInitCreatesStoreAndGitignore(t *testing.T) {
 	if p.Config.ActiveEnv != "development" || p.Config.ProjectID == "" {
 		t.Fatalf("%+v", p.Config)
 	}
-	key, err := keyring.Resolve(ring, p.Config.ProjectID)
+	key, _, err := keyring.Resolve(ring, p.Config.ProjectID, "")
 	if err != nil {
 		t.Fatal(err)
 	}

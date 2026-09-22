@@ -7,7 +7,7 @@ import (
 )
 
 func (a *App) lsCmd() *cobra.Command {
-	var values bool
+	var values, jsonOut bool
 	cmd := &cobra.Command{
 		Use:   "ls",
 		Short: "List secret keys",
@@ -21,11 +21,23 @@ func (a *App) lsCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			active := ""
-			if envName == p.Config.ActiveEnv {
-				active = "  ● active"
+			active := envName == p.Config.ActiveEnv
+			if jsonOut {
+				out := lsJSON{Env: envName, Active: active, Keys: keys}
+				if values {
+					m, err := doc.SecretMap(envName)
+					if err != nil {
+						return err
+					}
+					out.Values = m
+				}
+				return writeJSON(a.Stdout, out)
 			}
-			fmt.Fprintf(a.Stdout, "%s  %d secrets%s\n", envName, len(keys), active)
+			mark := ""
+			if active {
+				mark = "  ● active"
+			}
+			fmt.Fprintf(a.Stdout, "%s  %d secrets%s\n", envName, len(keys), mark)
 			m, err := doc.SecretMap(envName)
 			if err != nil {
 				return err
@@ -41,5 +53,13 @@ func (a *App) lsCmd() *cobra.Command {
 		},
 	}
 	cmd.Flags().BoolVar(&values, "values", false, "print secret values")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "machine-readable output (names only unless --values)")
 	return cmd
+}
+
+type lsJSON struct {
+	Env    string            `json:"env"`
+	Active bool              `json:"active"`
+	Keys   []string          `json:"keys"`
+	Values map[string]string `json:"values,omitempty"`
 }

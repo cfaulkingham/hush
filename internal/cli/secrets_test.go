@@ -102,3 +102,52 @@ func TestSetRejectsBadKey(t *testing.T) {
 		t.Fatal("expected validation error")
 	}
 }
+
+func TestSetInlineValueWarnsWithoutLeaking(t *testing.T) {
+	dir := t.TempDir()
+	app, _, errb, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	errb.Reset()
+	if err := runApp(t, app, "set", "TOKEN=hunter2"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(errb.String(), "shell history") {
+		t.Fatalf("missing argv warning: %s", errb.String())
+	}
+	if strings.Contains(errb.String(), "hunter2") {
+		t.Fatalf("value leaked to stderr: %s", errb.String())
+	}
+	out := &bytes.Buffer{}
+	app.Stdout = out
+	if err := runApp(t, app, "get", "TOKEN"); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "hunter2\n" {
+		t.Fatalf("value not stored: %q", out.String())
+	}
+}
+
+func TestSetFromStdinNoWarning(t *testing.T) {
+	dir := t.TempDir()
+	app, _, errb, _ := newTestApp(t, dir)
+	app.Stdin = bytes.NewBufferString("s3cret\n")
+	_ = runApp(t, app, "init")
+	errb.Reset()
+	if err := runApp(t, app, "set", "TOKEN", "--from-stdin"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(errb.String(), "shell history") {
+		t.Fatalf("unexpected argv warning: %s", errb.String())
+	}
+}
+
+func TestSetFromStdinRejectsInlineValue(t *testing.T) {
+	dir := t.TempDir()
+	app, _, _, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	app.Stdin = bytes.NewBufferString("s3cret\n")
+	err := runApp(t, app, "set", "TOKEN=oops", "--from-stdin")
+	if err == nil || !strings.Contains(err.Error(), "key name only") {
+		t.Fatalf("%v", err)
+	}
+}

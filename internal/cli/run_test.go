@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -99,5 +101,63 @@ func TestRunDoesNotPassHUSHKeyToChild(t *testing.T) {
 		if strings.HasPrefix(strings.ToUpper(kv), "HUSH_KEY=") {
 			t.Fatalf("master key leaked to child: %v", childEnv)
 		}
+	}
+}
+
+func TestRunRequire(t *testing.T) {
+	dir := t.TempDir()
+	app, _, _, _ := newTestApp(t, dir)
+	executed := false
+	app.Exec = func(argv, env []string) error {
+		executed = true
+		return nil
+	}
+	_ = runApp(t, app, "init")
+	_ = runApp(t, app, "set", "PRESENT=hunter2")
+	err := runApp(t, app, "run", "--require", "PRESENT,MISSING", "--", "true")
+	if err == nil || !strings.Contains(err.Error(), "MISSING") {
+		t.Fatalf("%v", err)
+	}
+	if strings.Contains(err.Error(), "hunter2") {
+		t.Fatalf("value leaked: %v", err)
+	}
+	if executed {
+		t.Fatal("executed despite missing secret")
+	}
+	if err := runApp(t, app, "run", "--require", "PRESENT", "--", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if !executed {
+		t.Fatal("did not execute with all secrets present")
+	}
+}
+
+func TestRunRequireFile(t *testing.T) {
+	dir := t.TempDir()
+	app, _, _, _ := newTestApp(t, dir)
+	executed := false
+	app.Exec = func(argv, env []string) error {
+		executed = true
+		return nil
+	}
+	_ = runApp(t, app, "init")
+	example := filepath.Join(dir, ".env.example")
+	if err := os.WriteFile(example, []byte("A=1\nB=2\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	err := runApp(t, app, "run", "--require-file", example, "--", "true")
+	if err == nil || !strings.Contains(err.Error(), "A, B") {
+		t.Fatalf("%v", err)
+	}
+	if executed {
+		t.Fatal("executed despite missing secrets")
+	}
+	_ = runApp(t, app, "set", "A=x")
+	_ = runApp(t, app, "set", "B=y")
+	if err := runApp(t, app, "run", "--require-file", example, "--", "true"); err != nil {
+		t.Fatal(err)
+	}
+	if !executed {
+		t.Fatal("did not execute")
 	}
 }

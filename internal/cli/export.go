@@ -1,16 +1,18 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/cfaulkingham/hush/internal/dotenv"
+	"github.com/cfaulkingham/hush/internal/safeio"
 	"github.com/spf13/cobra"
 )
 
 func (a *App) exportCmd() *cobra.Command {
 	var format, output string
-	var overwrite bool
+	var overwrite, force bool
 	cmd := &cobra.Command{
 		Use:   "export",
 		Args:  cobra.NoArgs,
@@ -40,26 +42,29 @@ func (a *App) exportCmd() *cobra.Command {
 				_, err = a.Stdout.Write(b)
 				return err
 			}
-			flags := os.O_WRONLY | os.O_CREATE | os.O_EXCL
-			if overwrite {
-				flags = os.O_WRONLY | os.O_CREATE | os.O_TRUNC
-			}
-			f, err := os.OpenFile(output, flags, 0600)
-			if err != nil {
-				if os.IsExist(err) {
+			if !overwrite {
+				if _, err := os.Lstat(output); err == nil {
 					return fmt.Errorf("%s exists (pass --overwrite)", output)
+				} else if !os.IsNotExist(err) {
+					return err
+				}
+			}
+			if !force && a.gitCheckPath(output) == gitNotIgnored {
+				return fmt.Errorf("refusing to write plaintext secrets to %s: git would track it. Use a gitignored path or pass --force", output)
+			}
+			if err := safeio.WriteFile(output, b, 0600); err != nil {
+				if errors.Is(err, safeio.ErrSymlink) {
+					return fmt.Errorf("refusing to write plaintext secrets through symlink %s", output)
 				}
 				return err
 			}
-			defer f.Close()
-			if _, err := f.Write(b); err != nil {
-				return err
-			}
-			return os.Chmod(output, 0600)
+			fmt.Fprintf(a.Stderr, "wrote plaintext secrets to %s (mode 0600). Delete it when done.\n", output)
+			return nil
 		},
 	}
 	cmd.Flags().StringVar(&format, "format", "dotenv", "dotenv or json")
 	cmd.Flags().StringVarP(&output, "output", "o", "", "write to file")
 	cmd.Flags().BoolVar(&overwrite, "overwrite", false, "overwrite output file")
+	cmd.Flags().BoolVar(&force, "force", false, "write even if the path is not gitignored")
 	return cmd
 }

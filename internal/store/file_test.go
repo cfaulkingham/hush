@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+// mustSymlink skips the test where symlinks cannot be created (e.g. Windows
+// without developer mode).
+func mustSymlink(t *testing.T, oldname, newname string) {
+	t.Helper()
+	if err := os.Symlink(oldname, newname); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+}
+
 func TestSaveLoadRoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "store")
@@ -46,9 +55,7 @@ func TestWriteFileRefusesSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	link := filepath.Join(dir, "store")
-	if err := os.Symlink(target, link); err != nil {
-		t.Fatal(err)
-	}
+	mustSymlink(t, target, link)
 	if err := WriteFile(link, []byte("HUSH1notreal")); !errors.Is(err, ErrSymlink) {
 		t.Fatalf("expected ErrSymlink, got %v", err)
 	}
@@ -65,9 +72,7 @@ func TestUpdateRefusesLockSymlink(t *testing.T) {
 	if err := os.WriteFile(target, []byte("unchanged"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Symlink(target, path+".lock"); err != nil {
-		t.Fatal(err)
-	}
+	mustSymlink(t, target, path+".lock")
 	err := Update(path, key, func(*Document) error { return nil })
 	if !errors.Is(err, ErrLockSymlink) {
 		t.Fatalf("expected ErrLockSymlink, got %v", err)

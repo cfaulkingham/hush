@@ -2,3 +2,4 @@
 /hush.exe
 /coverage.out
 *.test
+.DS_Store

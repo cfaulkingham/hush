@@ -11,7 +11,8 @@ import (
 )
 
 func (a *App) statusCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonOut bool
+	cmd := &cobra.Command{
 		Use:  "status",
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -23,7 +24,7 @@ func (a *App) statusCmd() *cobra.Command {
 			if err != nil {
 				return err
 			}
-			key, kerr := keyring.Resolve(a.Ring, p.Config.ProjectID)
+			key, source, kerr := keyring.Resolve(a.Ring, p.Config.ProjectID, a.hushKey())
 			name := "(unknown)"
 			nsecrets := 0
 			storeLine := ".hush/store"
@@ -50,16 +51,41 @@ func (a *App) statusCmd() *cobra.Command {
 					}
 				}
 			}
+			if jsonOut {
+				out := statusJSON{
+					Project: name,
+					ID:      p.Config.ProjectID,
+					Env:     p.Config.ActiveEnv,
+					Secrets: nsecrets,
+					Store:   storeLine,
+					Key:     source,
+				}
+				if err := writeJSON(a.Stdout, out); err != nil {
+					return err
+				}
+				return loadErr
+			}
 			fmt.Fprintf(a.Stdout, "project:  %s\n", name)
 			fmt.Fprintf(a.Stdout, "id:       %s\n", p.Config.ProjectID)
 			fmt.Fprintf(a.Stdout, "env:      %s\n", p.Config.ActiveEnv)
 			fmt.Fprintf(a.Stdout, "secrets:  %d\n", nsecrets)
 			fmt.Fprintf(a.Stdout, "store:    %s\n", storeLine)
-			fmt.Fprintf(a.Stdout, "key:      %s\n", keySource())
+			fmt.Fprintf(a.Stdout, "key:      %s\n", source)
 			if loadErr != nil {
 				return loadErr
 			}
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "machine-readable output")
+	return cmd
+}
+
+type statusJSON struct {
+	Project string `json:"project"`
+	ID      string `json:"id"`
+	Env     string `json:"env"`
+	Secrets int    `json:"secrets"`
+	Store   string `json:"store"`
+	Key     string `json:"key"`
 }

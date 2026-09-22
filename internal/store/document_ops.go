@@ -11,6 +11,7 @@ var (
 	ErrSecretNotFound = errors.New("secret not found")
 	ErrEnvNotFound    = errors.New("environment not found")
 	ErrEnvExists      = errors.New("environment already exists")
+	ErrLastEnv        = errors.New("refusing to remove the last environment")
 )
 
 func (d *Document) Env(name string) (*Environment, error) {
@@ -67,7 +68,7 @@ func (d *Document) GetSecret(env, key string) (string, error) {
 	return sec.Value, nil
 }
 
-func (d *Document) DeleteSecret(env, key string) error {
+func (d *Document) DeleteSecret(env, key string, now time.Time) error {
 	e, err := d.Env(env)
 	if err != nil {
 		return err
@@ -76,8 +77,71 @@ func (d *Document) DeleteSecret(env, key string) error {
 		return fmt.Errorf("%w: secret %s not found in %s", ErrSecretNotFound, key, env)
 	}
 	delete(e.Secrets, key)
-	now := time.Now().UTC()
+	now = now.UTC()
 	e.UpdatedAt = now
+	d.UpdatedAt = now
+	return nil
+}
+
+// RemoveEnv deletes an environment and all of its secrets.
+func (d *Document) RemoveEnv(name string, now time.Time) error {
+	if err := ValidateEnvName(name); err != nil {
+		return err
+	}
+	if _, ok := d.Environments[name]; !ok {
+		return fmt.Errorf("%w: environment %s not found", ErrEnvNotFound, name)
+	}
+	if len(d.Environments) <= 1 {
+		return ErrLastEnv
+	}
+	delete(d.Environments, name)
+	now = now.UTC()
+	d.UpdatedAt = now
+	return nil
+}
+
+// RenameEnv moves an environment and its secrets to a new name.
+func (d *Document) RenameEnv(oldName, newName string, now time.Time) error {
+	if err := ValidateEnvName(newName); err != nil {
+		return err
+	}
+	e, err := d.Env(oldName)
+	if err != nil {
+		return err
+	}
+	if oldName == newName {
+		return nil
+	}
+	if _, ok := d.Environments[newName]; ok {
+		return fmt.Errorf("%w: environment %s already exists", ErrEnvExists, newName)
+	}
+	delete(d.Environments, oldName)
+	d.Environments[newName] = e
+	now = now.UTC()
+	e.UpdatedAt = now
+	d.UpdatedAt = now
+	return nil
+}
+
+// CopyEnv seeds a new environment with the secrets of an existing one,
+// keeping values in the encrypted store (never on disk as plaintext).
+func (d *Document) CopyEnv(from, to string, now time.Time) error {
+	src, err := d.Env(from)
+	if err != nil {
+		return err
+	}
+	if err := ValidateEnvName(to); err != nil {
+		return err
+	}
+	if _, ok := d.Environments[to]; ok {
+		return fmt.Errorf("%w: environment %s already exists", ErrEnvExists, to)
+	}
+	now = now.UTC()
+	secrets := make(map[string]Secret, len(src.Secrets))
+	for k, s := range src.Secrets {
+		secrets[k] = Secret{Value: s.Value, UpdatedAt: now}
+	}
+	d.Environments[to] = &Environment{UpdatedAt: now, Secrets: secrets}
 	d.UpdatedAt = now
 	return nil
 }

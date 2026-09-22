@@ -12,6 +12,7 @@ import (
 var (
 	ErrNotFound      = errors.New("no hush project (run hush init)")
 	ErrConfigSymlink = errors.New("refusing to write through symlink .hush/config.json")
+	ErrDirSymlink    = errors.New("refusing to use symlink .hush directory")
 )
 
 type Config struct {
@@ -27,6 +28,37 @@ type Project struct {
 func Dir(root string) string        { return filepath.Join(root, ".hush") }
 func StorePath(root string) string  { return filepath.Join(Dir(root), "store") }
 func ConfigPath(root string) string { return filepath.Join(Dir(root), "config.json") }
+
+// EnsureDir creates .hush if needed and refuses to use it when it is a
+// symlink or not a directory, so project state never lands somewhere the
+// user did not intend.
+func EnsureDir(root string) error {
+	dir := Dir(root)
+	fi, err := os.Lstat(dir)
+	if err == nil {
+		if fi.Mode()&os.ModeSymlink != 0 {
+			return ErrDirSymlink
+		}
+		if !fi.IsDir() {
+			return errors.New(".hush exists and is not a directory")
+		}
+		return nil
+	}
+	if !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return err
+	}
+	fi, err = os.Lstat(dir)
+	if err != nil {
+		return err
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		return ErrDirSymlink
+	}
+	return nil
+}
 
 func Find(startDir string) (*Project, error) {
 	dir, err := filepath.Abs(startDir)
@@ -63,7 +95,7 @@ func LoadConfig(root string) (Config, error) {
 }
 
 func SaveConfig(root string, cfg Config) error {
-	if err := os.MkdirAll(Dir(root), 0755); err != nil {
+	if err := EnsureDir(root); err != nil {
 		return err
 	}
 	b, err := json.MarshalIndent(cfg, "", "  ")

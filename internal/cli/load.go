@@ -3,7 +3,6 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"os"
 
 	"github.com/cfaulkingham/hush/internal/keyring"
 	"github.com/cfaulkingham/hush/internal/project"
@@ -22,7 +21,7 @@ func (a *App) projectKey() (string, *project.Project, []byte, error) {
 	if err != nil {
 		return "", nil, nil, err
 	}
-	key, err := keyring.Resolve(a.Ring, p.Config.ProjectID)
+	key, _, err := keyring.Resolve(a.Ring, p.Config.ProjectID, a.hushKey())
 	if err != nil {
 		return "", nil, nil, err
 	}
@@ -64,14 +63,10 @@ func (a *App) open(cmd *cobra.Command) (string, *project.Project, []byte, *store
 	return cwd, p, key, doc, env, nil
 }
 
-func keySource() string {
-	if os.Getenv("HUSH_KEY") != "" {
-		return "HUSH_KEY"
-	}
-	return "keychain"
-}
-
 func (a *App) updateStore(p *project.Project, key []byte, update func(*store.Document) error) error {
+	if err := project.EnsureDir(p.Root); err != nil {
+		return err
+	}
 	return store.Update(project.StorePath(p.Root), key, func(doc *store.Document) error {
 		if doc.ProjectID != p.Config.ProjectID {
 			return fmt.Errorf("%w: config has %q, store has %q", ErrProjectMismatch, p.Config.ProjectID, doc.ProjectID)

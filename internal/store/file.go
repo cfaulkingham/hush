@@ -59,6 +59,28 @@ func Load(path string, key []byte) (*Document, error) {
 	return Decrypt(blob, key)
 }
 
+// Rekey re-encrypts the store at path with newKey under the store lock.
+// The store must decrypt with oldKey first; a wrong oldKey leaves the
+// store untouched.
+func Rekey(path string, oldKey, newKey []byte) (err error) {
+	if len(newKey) != KeySize {
+		return ErrBadKeySize
+	}
+	lock, err := acquireFileLock(path + ".lock")
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = errors.Join(err, lock.Close())
+	}()
+
+	doc, err := Load(path, oldKey)
+	if err != nil {
+		return err
+	}
+	return Save(path, doc, newKey)
+}
+
 // Update serializes read-modify-write transactions across hush processes.
 // The callback runs while the store lock is held and must not call Update.
 func Update(path string, key []byte, update func(*Document) error) (err error) {

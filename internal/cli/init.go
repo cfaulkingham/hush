@@ -30,6 +30,9 @@ func (a *App) initCmd() *cobra.Command {
 			hushDirExisted := false
 			if fi, err := os.Lstat(hushDir); err == nil {
 				hushDirExisted = true
+				if fi.Mode()&os.ModeSymlink != 0 {
+					return project.ErrDirSymlink
+				}
 				if !fi.IsDir() {
 					return fmt.Errorf(".hush exists and is not a directory")
 				}
@@ -41,7 +44,7 @@ func (a *App) initCmd() *cobra.Command {
 			} else if !os.IsNotExist(err) {
 				return err
 			}
-			if os.Getenv("HUSH_KEY") != "" {
+			if a.hushKey() != "" {
 				return errors.New("HUSH_KEY is set; unset it before running hush init")
 			}
 			configPath := project.ConfigPath(cwd)
@@ -75,10 +78,10 @@ func (a *App) initCmd() *cobra.Command {
 				return err
 			}
 			// Fail before creating project state if the project cannot be ignored.
-			if err := ensureGitignore(cwd); err != nil {
+			if err := ensureGitignore(cwd, a.gitCheckPath); err != nil {
 				return err
 			}
-			if err := os.MkdirAll(hushDir, 0755); err != nil {
+			if err := project.EnsureDir(cwd); err != nil {
 				return err
 			}
 			rollback := func(cause error) error {

@@ -142,3 +142,119 @@ func TestStatusRejectsMissingActiveEnvironment(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestStatusShowsHUSH_KEYSource(t *testing.T) {
+	dir := t.TempDir()
+	app, out, _, ring := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	p, _ := project.Find(dir)
+	s, _ := ring.Get("hush", p.Config.ProjectID)
+	t.Setenv("HUSH_KEY", s)
+	out.Reset()
+	if err := runApp(t, app, "status"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "key:      HUSH_KEY") {
+		t.Fatalf("%s", out.String())
+	}
+}
+
+func TestEnvCopyRenameRemove(t *testing.T) {
+	dir := t.TempDir()
+	app, out, _, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	_ = runApp(t, app, "set", "SECRET=s3cret")
+	out.Reset()
+	if err := runApp(t, app, "env", "copy", "development", "staging"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "1 secrets") {
+		t.Fatalf("%s", out.String())
+	}
+	out.Reset()
+	_ = runApp(t, app, "get", "--env", "staging", "SECRET")
+	if out.String() != "s3cret\n" {
+		t.Fatalf("copy lost value: %q", out.String())
+	}
+	if err := runApp(t, app, "env", "copy", "development", "staging"); err == nil {
+		t.Fatal("expected duplicate error")
+	}
+	if err := runApp(t, app, "env", "rename", "development", "dev"); err != nil {
+		t.Fatal(err)
+	}
+	cfg, _ := project.LoadConfig(dir)
+	if cfg.ActiveEnv != "dev" {
+		t.Fatalf("active env not renamed: %+v", cfg)
+	}
+	if err := runApp(t, app, "env", "rm", "staging", "--yes"); err != nil {
+		t.Fatal(err)
+	}
+	err := runApp(t, app, "get", "--env", "staging", "SECRET")
+	if err == nil {
+		t.Fatal("staging survived rm")
+	}
+}
+
+func TestEnvRmRefusesActiveAndLast(t *testing.T) {
+	dir := t.TempDir()
+	app, _, _, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	err := runApp(t, app, "env", "rm", "development", "--force")
+	if err == nil || !strings.Contains(err.Error(), "active environment") {
+		t.Fatalf("%v", err)
+	}
+	_ = runApp(t, app, "env", "new", "staging")
+	if err := runApp(t, app, "env", "rm", "staging", "--force"); err != nil {
+		t.Fatal(err)
+	}
+	// removing the last environment must fail
+	_ = runApp(t, app, "use", "development")
+	if err := runApp(t, app, "env", "rm", "development", "--force"); err == nil {
+		t.Fatal("expected last-env refusal")
+	}
+}
+
+func TestEnvRmConfirm(t *testing.T) {
+	dir := t.TempDir()
+	app, out, _, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	_ = runApp(t, app, "env", "new", "staging")
+	app.Ask = func(string) (string, error) { return "n", nil }
+	out.Reset()
+	if err := runApp(t, app, "env", "rm", "staging"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Aborted") {
+		t.Fatalf("%s", out.String())
+	}
+	if err := runApp(t, app, "use", "staging"); err != nil {
+		t.Fatal("aborted rm deleted the env")
+	}
+	app.Ask = func(string) (string, error) { return "y", nil }
+	if err := runApp(t, app, "use", "development"); err != nil {
+		t.Fatal(err)
+	}
+	if err := runApp(t, app, "env", "rm", "staging"); err != nil {
+		t.Fatal(err)
+	}
+	if err := runApp(t, app, "use", "staging"); err == nil {
+		t.Fatal("confirmed rm kept the env")
+	}
+}
+
+func TestEnvRmDryRun(t *testing.T) {
+	dir := t.TempDir()
+	app, out, _, _ := newTestApp(t, dir)
+	_ = runApp(t, app, "init")
+	_ = runApp(t, app, "env", "new", "staging")
+	out.Reset()
+	if err := runApp(t, app, "env", "rm", "staging", "--dry-run"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "nothing written") {
+		t.Fatalf("%s", out.String())
+	}
+	if err := runApp(t, app, "use", "staging"); err != nil {
+		t.Fatal("dry run deleted the env")
+	}
+}

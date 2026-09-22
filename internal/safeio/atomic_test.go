@@ -7,6 +7,15 @@ import (
 	"testing"
 )
 
+// mustSymlink skips the test where symlinks cannot be created (e.g. Windows
+// without developer mode).
+func mustSymlink(t *testing.T, oldname, newname string) {
+	t.Helper()
+	if err := os.Symlink(oldname, newname); err != nil {
+		t.Skipf("symlinks unavailable: %v", err)
+	}
+}
+
 func TestWriteFileReplacesAtomicallyWithRequestedMode(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.json")
@@ -39,9 +48,7 @@ func TestWriteFileRefusesSymlink(t *testing.T) {
 		t.Fatal(err)
 	}
 	link := filepath.Join(dir, "link")
-	if err := os.Symlink(target, link); err != nil {
-		t.Fatal(err)
-	}
+	mustSymlink(t, target, link)
 	if err := WriteFile(link, []byte("changed"), 0600); !errors.Is(err, ErrSymlink) {
 		t.Fatalf("expected ErrSymlink, got %v", err)
 	}
