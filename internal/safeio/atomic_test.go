@@ -4,8 +4,25 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
+
+// checkPerm asserts file mode bits; Windows only tracks the read-only bit,
+// so perms are reported as 0666/0444 there.
+func checkPerm(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != want {
+		t.Fatalf("mode %o want %o", fi.Mode().Perm(), want)
+	}
+}
 
 // mustSymlink skips the test where symlinks cannot be created (e.g. Windows
 // without developer mode).
@@ -32,13 +49,7 @@ func TestWriteFileReplacesAtomicallyWithRequestedMode(t *testing.T) {
 	if string(got) != "new" {
 		t.Fatalf("got %q", got)
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm() != 0644 {
-		t.Fatalf("mode %o", info.Mode().Perm())
-	}
+	checkPerm(t, path, 0644)
 }
 
 func TestWriteFileRefusesSymlink(t *testing.T) {

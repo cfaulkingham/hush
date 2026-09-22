@@ -110,10 +110,7 @@ func TestExportJSONAndOutputFile(t *testing.T) {
 	if err := runApp(t, app, "export", "-o", dest, "--overwrite"); err != nil {
 		t.Fatal(err)
 	}
-	fi, _ := os.Stat(dest)
-	if fi.Mode().Perm() != 0600 {
-		t.Fatalf("mode %o", fi.Mode().Perm())
-	}
+	checkPerm(t, dest, 0600)
 }
 
 func TestImportMissingFile(t *testing.T) {

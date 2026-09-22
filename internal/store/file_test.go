@@ -6,9 +6,26 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
+
+// checkPerm asserts file mode bits; Windows only tracks the read-only bit,
+// so perms are reported as 0666/0444 there.
+func checkPerm(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != want {
+		t.Fatalf("mode %o want %o", fi.Mode().Perm(), want)
+	}
+}
 
 // mustSymlink skips the test where symlinks cannot be created (e.g. Windows
 // without developer mode).
@@ -31,13 +48,7 @@ func TestSaveLoadRoundTrip(t *testing.T) {
 	if err := Save(path, doc, key); err != nil {
 		t.Fatal(err)
 	}
-	fi, err := os.Stat(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fi.Mode().Perm() != 0600 {
-		t.Fatalf("mode %o", fi.Mode().Perm())
-	}
+	checkPerm(t, path, 0600)
 	got, err := Load(path, key)
 	if err != nil {
 		t.Fatal(err)
@@ -89,6 +100,9 @@ func TestUpdateRefusesLockSymlink(t *testing.T) {
 func TestWriteFileLeavesExistingOnFailure(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("chmod 0555 still writable as root")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("read-only directories do not block writes on Windows")
 	}
 	dir := t.TempDir()
 	path := filepath.Join(dir, "store")

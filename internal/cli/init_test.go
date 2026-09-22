@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,22 @@ import (
 	"github.com/cfaulkingham/hush/internal/project"
 	"github.com/cfaulkingham/hush/internal/store"
 )
+
+// checkPerm asserts file mode bits; Windows only tracks the read-only bit,
+// so perms are reported as 0666/0444 there.
+func checkPerm(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm() != want {
+		t.Fatalf("mode %o want %o", fi.Mode().Perm(), want)
+	}
+}
 
 type failingSetRing struct {
 	*keyring.Memory
@@ -89,13 +106,7 @@ func TestInitCreatesStoreAndGitignore(t *testing.T) {
 	if !strings.Contains(string(gi), ".hush/") {
 		t.Fatalf("gitignore %s", gi)
 	}
-	fi, err := os.Stat(project.StorePath(dir))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fi.Mode().Perm() != 0600 {
-		t.Fatalf("mode %o", fi.Mode().Perm())
-	}
+	checkPerm(t, project.StorePath(dir), 0600)
 }
 
 func TestInitRefusesExisting(t *testing.T) {
